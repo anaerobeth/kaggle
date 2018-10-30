@@ -19,15 +19,15 @@ def fade(pixel):
     return pixel * random.uniform(0.4, .8)
 
 def zap(df):
-    cols = random.sample(df.columns.tolist(), 156)
+    cols = random.sample(df.columns.tolist(), 79)
     for col in cols:
         df[col] = 0
     return df
 
 def noise(df):
-    cols = random.sample(df.columns.tolist(), 39)
+    cols = random.sample(df.columns.tolist(), 19)
     for col in cols:
-        df[col] = 255 * random.uniform(0.1, 1)
+        df[col] = 255 * random.uniform(0.1, 0.5)
     return df
 
 
