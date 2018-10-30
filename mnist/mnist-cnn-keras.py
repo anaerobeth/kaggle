@@ -7,9 +7,9 @@ https://www.kaggle.com/c/digit-recognizer/data
 
 Algorithms Used: CNN
 Submissions and Public Score:
-1-CNN+4XData+Keras
+1-CNN+4XData+Keras - 0.99628
 
-Reference:
+References:
 - https://www.kaggle.com/dhimananubhav/mnist-99-74-with-convoluted-nn-and-keras
 """
 
@@ -51,13 +51,13 @@ train = train.drop('label', axis=1)
 train_reshaped = np.array(train).reshape(168000, 28, 28)
 test_reshaped = np.array(test).reshape(28000, 28, 28)
 
-print('Training Image: ', train_labels[100])
-plt.imshow(train_reshaped[100], cmap=plt.cm.binary)
-plt.show()
+# print('Training Image: ', train_labels[100])
+# plt.imshow(train_reshaped[100], cmap=plt.cm.binary)
+# plt.show()
 
-print('Test Image: ')
-plt.imshow(test_reshaped[100], cmap=plt.cm.binary)
-plt.show()
+# print('Test Image: ')
+# plt.imshow(test_reshaped[100], cmap=plt.cm.binary)
+# plt.show()
 
 train_scaled = train_reshaped.reshape(168000, 28, 28, 1) / 255.0
 test_scaled = test_reshaped.reshape(28000, 28, 28, 1) / 255.0
@@ -92,21 +92,33 @@ model.add(layers.Flatten())
 model.add(layers.Dense(64, activation='relu'))
 model.add(layers.Dense(10, activation='softmax'))
 model.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
-print(model.summary)
+
+print(model.summary())
+# Total params: 93,322
+# Trainable params: 93,322
+# Non-trainable params: 0
 
 # Fit and evaluate
 num_epochs = 30
 batch_size = 2048
+print('fitting model')
 model.fit(train_images, train_labels, epochs=num_epochs, batch_size=batch_size)
 test_loss, test_acc = model.evaluate(test_k_scaled, test_labels_k)
 print('-'*20)
 print('Accuracy on test data: ', test_acc)
 
-# PREDICT & ARGMAX to get the digit from the probability of softmax layer
+# Model Stats
+# Epoch 30/30
+# 228000/228000 [==============================] - 132s 577us/step - loss: 0.0203 - acc: 0.9934
+# 10000/10000 [==============================] - 1s 136us/step
+# --------------------
+# Accuracy on test data:  0.9974
+
+# Get the digit from the probability of softmax layer
 raw_pred = model.predict(test_scaled)
-pred = []
-for i in range(raw_pred.shape[0]):
-    pred.append(np.argmax(raw_pred[i]))
+
+# pred = [ np.argmax(raw_pred[i]) for i in range(raw_pred.shape[0]) ]
+pred = np.argmax(results, axis=1)
 
 predictions = np.array(pred)
 
