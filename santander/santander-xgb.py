@@ -1,0 +1,99 @@
+"""
+Santander Value Prediction Challenge
+https://www.kaggle.com/c/santander-value-prediction-challenge
+
+Goal: identify the value of transactions for each potential customer
+Data: anonymized dataset containing numeric feature variables
+https://www.kaggle.com/c/santander-value-prediction-challenge/data
+
+Algorithms Used: LightGBM, XGB
+Submissions and Public Score:
+1-XGB+LightGBM
+
+References:
+- https://www.kaggle.com/samratp/santander-value-prediction-xgb-and-lightgbm
+"""
+
+import pdb
+import pandas as pd
+import xgboost as xgb
+import numpy as np
+from sklearn import model_selection
+from sklearn.model_selection import train_test_split
+
+print('done with imports')
+def run_xgb(train_X, train_y, val_X, val_y, test_X):
+    params = {'objective': 'reg:linear',
+          'eval_metric': 'rmse',
+          'eta': 0.005,
+          'max_depth': 15,
+          'subsample': 0.7,
+          'colsample_bytree': 0.5,
+          'alpha':0,
+          'random_state': 42,
+          'silent': True}
+
+    tr_data = xgb.DMatrix(train_X, train_y)
+    va_data = xgb.DMatrix(val_X, val_y)
+
+    watchlist = [(tr_data, 'train'), (va_data, 'valid')]
+
+    model_xgb = xgb.train(params, tr_data, 2000, watchlist, maximize=False, early_stopping_rounds = 30, verbose_eval=100)
+
+    dtest = xgb.DMatrix(test_X)
+    xgb_pred_y = np.expm1(model_xgb.predict(dtest, ntree_limit=model_xgb.best_ntree_limit))
+
+    return xgb_pred_y, model_xgb
+
+print('importing data')
+train = pd.read_csv('data/train.csv')
+test = pd.read_csv('data/test.csv')
+
+# Count null values in columns
+# null_columns=train.columns[train.isnull().any()]
+# train[null_columns].isnull().sum()
+# Series([], dtype: float64)
+
+# test_null_columns=test.columns[test.isnull().any()]
+# test[test_null_columns].isnull().sum()
+# Series([], dtype: float64)
+
+# Remove non-informative columns (same value for all rows)
+train_df = train.loc[:, (train != train.iloc[0]).any()]
+test_df = test.loc[:, (test != test.iloc[0]).any()]
+
+# # Check range of values
+# df = train_df.drop('ID', axis=1)
+# df = df.drop('target', axis=1)
+# diff = df.max() - df.min()
+# # Result: Ranges are from 0 to 10^9, need to scale values
+
+# # Divide values in each column by the max() value of that column
+# for col in diff.index.tolist():
+#     train_df.loc[:, col] = train_df[col] / (diff[col] + 1)
+#     # Add 1 avoid zero division error
+
+print('creating model')
+# XGB model
+X_train = train_df.drop(["ID", "target"], axis=1)
+y_train = np.log1p(train_df["target"].values)
+X_test = test_df.drop(["ID"], axis=1)
+
+dev_X, val_X, dev_y, val_y = train_test_split(X_train, y_train, test_size = 0.2, random_state = 42)
+
+pdb.set_trace()
+
+print('making predictions')
+
+# XGB model
+pred_test_xgb, model_xgb = run_xgb(dev_X, dev_y, val_X, val_y, X_test)
+print("XGB Training Completed...")
+
+sub = pd.read_csv('data/sample_submission.csv')
+sub_xgb = pd.DataFrame()
+sub_xgb["target"] = pred_test_xgb
+
+print(sub.head())
+sub.to_csv('xgb-scaled-1.csv', index=False)
+
+
