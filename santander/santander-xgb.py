@@ -6,12 +6,14 @@ Goal: identify the value of transactions for each potential customer
 Data: anonymized dataset containing numeric feature variables
 https://www.kaggle.com/c/santander-value-prediction-challenge/data
 
-Algorithms Used: LightGBM, XGB
+Algorithms Used: XGB, CatBoostRegressor
 Submissions and Public Score:
 1-XGB-1 - 2.08572
+3-Cat-1 - 11.9282
 
 References:
 - https://www.kaggle.com/samratp/santander-value-prediction-xgb-and-lightgbm
+- https://tech.yandex.com/catboost/doc/dg/concepts/python-usages-examples-docpage/
 """
 
 import pdb
@@ -88,11 +90,10 @@ pred_test_xgb, model_xgb = run_xgb(dev_X, dev_y, val_X, val_y, X_test)
 print("XGB Training Completed...")
 
 sub = pd.read_csv('data/sample_submission.csv')
-sub_xgb = pd.DataFrame()
-sub_xgb["target"] = pred_test_xgb
+sub["target"] = pred_test_xgb
 
-print(sub_xgb.head())
-sub_xgb.to_csv('xgb-1.csv', index=False)
+print(sub.head())
+sub.to_csv('xgb-1.csv', index=False)
 
 
 # Model 2
@@ -106,10 +107,15 @@ dev_X, val_X, dev_y, val_y = train_test_split(X_train, y_train, test_size = 0.2,
 print('making predictions using scaled values')
 pred_test_xgb2, model_xgb2 = run_xgb(dev_X, dev_y, val_X, val_y, X_test)
 print("XGB Training on Scaled Values Completed...")
+# Result the same as model 1: [1438] train-rmse:0.719389 valid-rmse:1.42394
 
-sub = pd.read_csv('data/sample_submission.csv')
-sub_xgb2 = pd.DataFrame()
-sub_xgb2["target"] = pred_test_xgb2
+# Model 3
+# CatBoostRegressor - gradient boosting on decision trees by Yandex
+from catboost import CatBoostRegressor
+model_cb = CatBoostRegressor(iterations=1000, learning_rate=0.01, depth=4, eval_metric='RMSE')
+model_cb.fit(X_train, y_train, cat_features=[], use_best_model=True)
+preds = model_cb.predict(X_test)
+# Result: 999: learn: 1.1991732 total: 1m 58
+# Scored worse on the Kaggle dataset
 
-print(sub_xgb2.head())
-sub_xgb2.to_csv('xgb-2.csv', index=False)
+
