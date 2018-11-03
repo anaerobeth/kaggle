@@ -8,7 +8,7 @@ https://www.kaggle.com/c/santander-value-prediction-challenge/data
 
 Algorithms Used: LightGBM, XGB
 Submissions and Public Score:
-1-XGB+LightGBM
+1-XGB-1 - 2.08572
 
 References:
 - https://www.kaggle.com/samratp/santander-value-prediction-xgb-and-lightgbm
@@ -58,9 +58,11 @@ test = pd.read_csv('data/test.csv')
 # test[test_null_columns].isnull().sum()
 # Series([], dtype: float64)
 
-# Remove non-informative columns (same value for all rows)
+# Remove non-informative columns from train (same value for all rows)
 train_df = train.loc[:, (train != train.iloc[0]).any()]
-test_df = test.loc[:, (test != test.iloc[0]).any()]
+
+# Ensure test has same columns as train (avoid feature mismatch when running XGB)
+test_df = test[train_df.columns.drop('target')]
 
 # # Check range of values
 # df = train_df.drop('ID', axis=1)
@@ -81,11 +83,7 @@ X_test = test_df.drop(["ID"], axis=1)
 
 dev_X, val_X, dev_y, val_y = train_test_split(X_train, y_train, test_size = 0.2, random_state = 42)
 
-pdb.set_trace()
-
 print('making predictions')
-
-# XGB model
 pred_test_xgb, model_xgb = run_xgb(dev_X, dev_y, val_X, val_y, X_test)
 print("XGB Training Completed...")
 
@@ -93,7 +91,25 @@ sub = pd.read_csv('data/sample_submission.csv')
 sub_xgb = pd.DataFrame()
 sub_xgb["target"] = pred_test_xgb
 
-print(sub.head())
-sub.to_csv('xgb-scaled-1.csv', index=False)
+print(sub_xgb.head())
+sub_xgb.to_csv('xgb-1.csv', index=False)
 
 
+# Model 2
+# Use Scaler to normalize values
+from sklearn.preprocessing import MinMaxScaler
+scaler = MinMaxScaler()
+X_train = pd.DataFrame(scaler.fit_transform(X_train), columns=X_train.columns)
+X_test = pd.DataFrame(scaler.fit_transform(X_test), columns=X_test.columns)
+
+dev_X, val_X, dev_y, val_y = train_test_split(X_train, y_train, test_size = 0.2, random_state = 42)
+print('making predictions using scaled values')
+pred_test_xgb2, model_xgb2 = run_xgb(dev_X, dev_y, val_X, val_y, X_test)
+print("XGB Training on Scaled Values Completed...")
+
+sub = pd.read_csv('data/sample_submission.csv')
+sub_xgb2 = pd.DataFrame()
+sub_xgb2["target"] = pred_test_xgb2
+
+print(sub_xgb2.head())
+sub_xgb2.to_csv('xgb-2.csv', index=False)
