@@ -46,8 +46,8 @@ def rmse(y_true, y_pred):
 
 reg = XGBRegressor(n_estimators=10)
 folds = KFold(n_splits=4, shuffle=True, random_state=42)
-# fold_index = [(train, val) for train, val in folds.split(data)]
-# scores = []
+fold_index = [(train, val) for train, val in folds.split(data)]
+scores = []
 
 nb_values = data.nunique(dropna=False)
 nb_zeros = (data == 0).astype(np.uint8).sum(axis=0)
@@ -98,6 +98,8 @@ test['log_leak'] = np.log1p(test_leak['compiled_leak'])
 # Model 1
 # Lightgbm
 
+# Use 5 splits this time
+folds = KFold(n_splits=5, shuffle=True, random_state=1)
 def add_stats(df):
     df['log_of_mean'] = np.log1p(df[features].replace(0, np.nan).mean(axis=1))
     df['mean_of_log'] = np.log1p(df[features]).replace(0, np.nan).mean(axis=1)
@@ -111,13 +113,6 @@ def add_stats(df):
 
 data.replace(0, np.nan, inplace=True)
 data = add_stats(data)
-data['log_of_mean'] = np.log1p(data[features].replace(0, np.nan).mean(axis=1))
-data['mean_of_log'] = np.log1p(data[features]).replace(0, np.nan).mean(axis=1)
-data['log_of_median'] = np.log1p(data[features].replace(0, np.nan).median(axis=1))
-data['nb_nans'] = data[features].isnull().sum(axis=1)
-data['the_sum'] = np.log1p(data[features].sum(axis=1))
-data['the_std'] = data[features].std(axis=1)
-data['the_kur'] = data[features].kurtosis(axis=1)
 
 test.replace(0, np.nan, inplace=True)
 test = add_stats(test)
@@ -128,6 +123,7 @@ final_features = good_features.tolist() + extra_features
 oof_preds = np.zeros(data.shape[0])
 test['target'] = 0
 
+# Params from zeus75 Kaggle kernel referenced above
 lgb_params = {
     'objective': 'regression',
     'num_leaves': 58,
@@ -168,9 +164,9 @@ run_lgb(data, lgb, dtrain, target, oof_preds, lgb_params)
 data['predictions'] = oof_preds
 data.loc[data['leak'].notnull(), 'predictions'] = np.log1p(data.loc[data['leak'].notnull(),'leak'])
 print('OOF SCORE : %9.6f' % (mean_squared_error(target, oof_preds) ** .5))
-# 12.66
+# 12.66 on folds with n_split=4
 print('OOF SCORE with LEAK : %9.6f' % (mean_squared_error(target, data['predictions']) ** .5))
-# 5.44
+# 5.44 on folds with n_split=4
 
 test['target'] = np.expm1(test['target'])
 test.loc[test['leak'].notnull(), 'target'] = test.loc[test['leak'].notnull(), 'leak']
@@ -190,14 +186,18 @@ lgb_params2 = {
 }
 
 run_lgb(data, lgb, dtrain, target, oof_preds, lgb_params2)
-# 1.40596
+# 1.40596 on folds with n_split=4
+# 1.39831 on folds with n_split=5
 
 data['predictions'] = oof_preds
 data.loc[data['leak'].notnull(), 'predictions'] = np.log1p(data.loc[data['leak'].notnull(),'leak'])
 print('OOF SCORE : %9.6f' % (mean_squared_error(target, oof_preds) ** .5))
-# 1.422552
+# 1.422552 on folds with n_split=4
+# 1.428494 on folds with n_split=5
+
 print('OOF SCORE with LEAK : %9.6f' % (mean_squared_error(target, data['predictions']) ** .5))
-# 0.715947
+# 0.715947 on folds with n_split=4
+# 0.716773 on folds with n_split=5
 
 test['target'] = np.expm1(test['target'])
 test.loc[test['leak'].notnull(), 'target'] = test.loc[test['leak'].notnull(), 'leak']
