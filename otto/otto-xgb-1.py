@@ -59,3 +59,20 @@ gbm3 = xgb.train(params3, train_xgb, training_rounds)
 pred3 = gbm3.predict(test_xgb)
 submission3 = pd.DataFrame(pred3, index=sample.id.values, columns=sample.columns[1:])
 submission3.to_csv('xgb-3.csv', index_label='id')
+
+
+# Model 4: Use scaling and train_test_split
+
+# Scale and split into test and dev
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.model_selection import train_test_split
+scaler = MinMaxScaler()
+X_train = pd.DataFrame(scaler.fit_transform(train), columns=train.columns)
+X_test = pd.DataFrame(scaler.fit_transform(test), columns=test.columns)
+dev_X, val_X, dev_y, val_y = train_test_split(X_train, labels, test_size = 0.2, random_state = 42)
+params = {"objective": "multi:softprob", "eval_metric":"mlogloss", "num_class": 9}
+training_rounds = 100
+dev_xgb = xgb.DMatrix(dev_X, dev_y)
+val_xgb = xgb.DMatrix(val_X)
+gbm = xgb.train(params, dev_xgb, training_rounds)
+pred = gbm.predict(val_xgb)
