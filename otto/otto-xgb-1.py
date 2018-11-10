@@ -64,6 +64,7 @@ submission3.to_csv('xgb-3.csv', index_label='id')
 # Model 4: Use scaling and train_test_split
 
 # Scale and split into test and dev
+import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
 scaler = MinMaxScaler()
@@ -76,3 +77,12 @@ dev_xgb = xgb.DMatrix(dev_X, dev_y)
 val_xgb = xgb.DMatrix(val_X)
 gbm = xgb.train(params, dev_xgb, training_rounds)
 pred = gbm.predict(val_xgb)
+# Evaluate logloss
+def logloss(num_observations, num_labels, labels, pred):
+    total = 0
+    for i in range(1, num_observations):
+        for j in range(1, num_labels):
+            yij = 1 if labels[i] == j else 0
+            pij = pred[i][j]
+            total += yij * np.log(pij)
+    return -(1.0 / num_observations) * total
