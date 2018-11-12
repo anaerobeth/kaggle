@@ -64,5 +64,49 @@ for df in [train, test]:
 
 target = train['totals.transactionRevenue'].fillna(0).astype(float)
 target = target.apply(lambda x: np.log1p(x))
-del train_df['totals.transactionRevenue']
+del train['totals.transactionRevenue']
+
+
+# Preprocessing
+# Workflow from https://www.kaggle.com/fabiendaniel/lgbm-rf-starter-lb-1-70
+# 1. Drop columns with no information,
+columns = [col for col in train.columns if train[col].nunique() > 1]
+train = train[columns]
+test = test[columns]
+train_length = train.shape[0]
+
+# Temporarily combine train and test to simplify manipulations
+merged_df = pd.concat([train, test])
+merged_df['diff_visitId_time'] = merged_df['visitId'] - merged_df['visitStartTime']
+merged_df['diff_visitId_time'] = (merged_df['diff_visitId_time'] != 0).astype(int)
+
+# 2. create few time-related columns
+merged_df['formated_date'] = merged_df['date'].apply(lambda x: datetime.strptime(str(x), '%Y%m%d'))
+merged_df['WoY'] = merged_df['formated_date'].apply(lambda x: x.isocalendar()[1])
+merged_df['month'] = merged_df['formated_date'].apply(lambda x:x.month)
+merged_df['quarter_month'] = merged_df['formated_date'].apply(lambda x:x.day//8)
+merged_df['weekday'] = merged_df['formated_date'].apply(lambda x:x.weekday())
+merged_df['formated_visitStartTime'] = merged_df['visitStartTime'].apply(
+    lambda x: time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(x)))
+merged_df['formated_visitStartTime'] = pd.to_datetime(merged_df['formated_visitStartTime'])
+merged_df['visit_hour'] = merged_df['formated_visitStartTime'].apply(lambda x: x.hour)
+
+# 3. label-encode the categorical columns
+for col in merged_df.columns:
+    if col in ['fullVisitorId', 'month', 'quarter_month', 'weekday', 'visit_hour', 'WoY']:
+        continue
+    if merged_df[col].dtypes == object or merged_df[col].dtypes == bool:
+        merged_df[col], indexer = pd.factorize(merged_df[col])
+
+# Delete unneeded columns
+del merged_df['visitId']
+del merged_df['sessionId']
+del merged_df['date']
+del merged_df['formated_date']
+del merged_df['visitStartTime']
+del merged_df['formated_visitStartTime']
+
+# Once manipulations are finished, split back into train and test records
+train_df = merged_df[:train_length]
+test_df = merged_df[train_length:]
 
