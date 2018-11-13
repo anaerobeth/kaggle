@@ -110,3 +110,22 @@ del merged_df['formated_visitStartTime']
 train_df = merged_df[:train_length]
 test_df = merged_df[train_length:]
 
+# Model 1 - LGBM
+param = {'num_leaves': 300,
+         'min_data_in_leaf': 30,
+         'objective':'regression',
+         'learning_rate': 0.01,
+         "boosting": "gbdt",
+         "feature_fraction": 0.9,
+         "metric": 'rmse',
+         "verbosity": -1}
+
+train_cols = [col for col in train_df.columns if col not in ['fullVisitorId']]
+folds = KFold(n_splits=5, shuffle=True, random_state=42)
+oof = np.zeros(len(train_df))
+predictions = np.zeros(len(test_df))
+features = list(train_df[train_cols].columns)
+feature_importance_df = pd.DataFrame()
+
+folds_split = folds.split(train_df.values, target.values)
+
