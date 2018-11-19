@@ -106,6 +106,13 @@ del merged_df['formated_date']
 del merged_df['visitStartTime']
 del merged_df['formated_visitStartTime']
 
+numerics = [col for col in merged_df.columns if 'totals.' in col]
+numerics += ['visitNumber', 'mean_hits_per_day', 'fullVisitorId']
+categorical_feats =  [col for col in merged_df.columns if col not in numerics]
+
+for col in categorical_feats:
+    merged_df[col] = merged_df[col].astype(int)
+
 # Once manipulations are finished, split back into train and test records
 train_df = merged_df[:train_length]
 test_df = merged_df[train_length:]
@@ -126,6 +133,20 @@ oof = np.zeros(len(train_df))
 predictions = np.zeros(len(test_df))
 features = list(train_df[train_cols].columns)
 feature_importance_df = pd.DataFrame()
-
 folds_split = folds.split(train_df.values, target.values)
+
+for _fold, (train_index, val_index) in enumerate(folds_split):
+    train_data = lgb.Dataset(train_df.iloc[train_index][train_cols], label=target.iloc[train_index], categorical_feature=categorical_feats)
+    val_data = lgb.Dataset(train_df.iloc[val_index][train_cols], label=target.iloc[val_index], categorical_feature=categorical_feats)
+
+    num_round = 10000
+    clf = lgb.train(param, train_data, num_round, valid_sets = [train_data, val_data], verbose_eval=100, early_stopping_rounds = 100)
+    oof[val_index] = clf.predict(train_df.iloc[val_index][train_cols], num_iteration=clf.best_iteration)
+    fold_importance_df = pd.DataFrame()
+    fold_importance_df["feature"] = features
+    fold_importance_df["importance"] = clf.feature_importance()
+    fold_importance_df["fold"] = fold_ + 1
+    feature_importance_df = pd.concat([feature_importance_df, fold_importance_df], axis=0)
+    predictions += clf.predict(test_df[trn_cols], num_iteration=clf.best_iteration) / folds.n_splits
+
 
