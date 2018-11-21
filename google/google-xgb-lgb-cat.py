@@ -149,4 +149,17 @@ for _fold, (train_index, val_index) in enumerate(folds_split):
     feature_importance_df = pd.concat([feature_importance_df, fold_importance_df], axis=0)
     predictions += clf.predict(test_df[trn_cols], num_iteration=clf.best_iteration) / folds.n_splits
 
+cols = feature_importance_df[["feature", "importance"]].groupby("feature").mean().sort_values(
+    by="importance", ascending=False)[:1000].index
+
+best_features = feature_importance_df.loc[feature_importance_df.feature.isin(cols)]
+
+print(best_features.head())
+
+# Create submission
+submission = test_df[['fullVisitorId']].copy()
+submission.loc[:, 'PredictedLogRevenue'] = np.expm1(predictions)
+grouped_test = submission[['fullVisitorId', 'PredictedLogRevenue']].groupby('fullVisitorId').sum().reset_index()
+grouped_test["PredictedLogRevenue"] = np.log1p(grouped_test["PredictedLogRevenue"])
+grouped_test.to_csv('submit.csv',index=False)
 
