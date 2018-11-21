@@ -19,11 +19,15 @@ References:
 
 import pandas as pd
 import numpy as np
+import time
 import xgboost as xgb
 import lightgbm as lgb
 import catboost as cat
 import gc
 gc.enable()
+from datetime import datetime
+from sklearn.model_selection import KFold
+from sklearn.metrics import mean_squared_error
 
 def read_external_data(filename):
     return pd.read_csv(filename, low_memory=False, skiprows=6, dtype={"Client Id":'str'})
@@ -66,7 +70,6 @@ target = train['totals.transactionRevenue'].fillna(0).astype(float)
 target = target.apply(lambda x: np.log1p(x))
 del train['totals.transactionRevenue']
 
-
 # Preprocessing
 # Workflow from https://www.kaggle.com/fabiendaniel/lgbm-rf-starter-lb-1-70
 # 1. Drop columns with no information,
@@ -108,6 +111,15 @@ del merged_df['formated_visitStartTime']
 
 numerics = [col for col in merged_df.columns if 'totals.' in col]
 numerics += ['visitNumber', 'mean_hits_per_day', 'fullVisitorId']
+
+# Check for null values
+# merged_df.isnull().sum()
+# Results: totals.pageviews, Sessions and Transactions
+# Remove columns with null values for now
+del merged_df['totals.pageviews']
+del merged_df['Sessions']
+del merged_df['Transactions']
+
 categorical_feats =  [col for col in merged_df.columns if col not in numerics]
 
 for col in categorical_feats:
