@@ -9,7 +9,8 @@ Data: preprocessed data for Part A + exported google analytics data
 - https://www.kaggle.com/satian/exported-google-analytics-data
 
 Algorithms Used: XGB, LGB, CAT
-Submissions and Public Score:
+Model Scores (CV Score):
+1-LGB 1.65670
 
 References:
 - https://www.kaggle.com/zikazika/google-predictions
@@ -30,11 +31,11 @@ from sklearn.model_selection import KFold
 from sklearn.metrics import mean_squared_error
 
 def read_external_data(filename):
-    return pd.read_csv(filename, low_memory=False, skiprows=6, dtype={"Client Id":'str'})
+    return pd.read_csv(filename, low_memory=False, skiprows=6, dtype={'Client Id':'str'})
 
 def merge_data(base_df, df_1, df_2):
-    df = base_df.merge(pd.concat([df_1, df_2], sort=False), how="left", on="visitId")
-    df.drop("Client Id", 1, inplace=True)
+    df = base_df.merge(pd.concat([df_1, df_2], sort=False), how='left', on='visitId')
+    df.drop('Client Id', 1, inplace=True)
     return df
 
 # Load preprocessed data
@@ -50,7 +51,7 @@ test_store_2 = read_external_data('data/Test_external_data_2.csv')
 
 # Get VisitId from Google Analytics
 for df in [train_store_1, train_store_2, test_store_1, test_store_2]:
-    df["visitId"] = df["Client Id"].apply(lambda x: x.split('.', 1)[1]).astype(np.int64)
+    df['visitId'] = df['Client Id'].apply(lambda x: x.split('.', 1)[1]).astype(np.int64)
 
 # Merge with train/test data
 train = merge_data(train, train_store_1, train_store_2)
@@ -134,10 +135,10 @@ param = {'num_leaves': 300,
          'min_data_in_leaf': 30,
          'objective':'regression',
          'learning_rate': 0.01,
-         "boosting": "gbdt",
-         "feature_fraction": 0.9,
-         "metric": 'rmse',
-         "verbosity": -1}
+         'boosting': 'gbdt',
+         'feature_fraction': 0.9,
+         'metric': 'rmse',
+         'verbosity': -1}
 
 train_cols = [col for col in train_df.columns if col not in ['fullVisitorId']]
 folds = KFold(n_splits=5, shuffle=True, random_state=42)
@@ -147,7 +148,7 @@ features = list(train_df[train_cols].columns)
 feature_importance_df = pd.DataFrame()
 folds_split = folds.split(train_df.values, target.values)
 
-for _fold, (train_index, val_index) in enumerate(folds_split):
+for fold_, (train_index, val_index) in enumerate(folds_split):
     train_data = lgb.Dataset(train_df.iloc[train_index][train_cols], label=target.iloc[train_index], categorical_feature=categorical_feats)
     val_data = lgb.Dataset(train_df.iloc[val_index][train_cols], label=target.iloc[val_index], categorical_feature=categorical_feats)
 
@@ -155,23 +156,31 @@ for _fold, (train_index, val_index) in enumerate(folds_split):
     clf = lgb.train(param, train_data, num_round, valid_sets = [train_data, val_data], verbose_eval=100, early_stopping_rounds = 100)
     oof[val_index] = clf.predict(train_df.iloc[val_index][train_cols], num_iteration=clf.best_iteration)
     fold_importance_df = pd.DataFrame()
-    fold_importance_df["feature"] = features
-    fold_importance_df["importance"] = clf.feature_importance()
-    fold_importance_df["fold"] = fold_ + 1
+    fold_importance_df['feature'] = features
+    fold_importance_df['importance'] = clf.feature_importance()
+    fold_importance_df['fold'] = fold_ + 1
     feature_importance_df = pd.concat([feature_importance_df, fold_importance_df], axis=0)
-    predictions += clf.predict(test_df[trn_cols], num_iteration=clf.best_iteration) / folds.n_splits
+    predictions += clf.predict(test_df[train_cols], num_iteration=clf.best_iteration) / folds.n_splits
 
-cols = feature_importance_df[["feature", "importance"]].groupby("feature").mean().sort_values(
-    by="importance", ascending=False)[:1000].index
+print("CV score: {:<8.5f}".format(mean_squared_error(oof, target)**0.5))
+# CV score: 1.65670
+# Score is worse compared to 1.61782 score in the source kernel
+# Possible reasons: differences in tuning params used;
+# removed feature with null values like 'totals.pageviews' may be important
+
+cols = feature_importance_df[['feature', 'importance']].groupby('feature').mean().sort_values(
+    by='importance', ascending=False)[:1000].index
 
 best_features = feature_importance_df.loc[feature_importance_df.feature.isin(cols)]
 
-print(best_features.head())
+print(best_features.sort_values(by="importance", ascending=False).head(20))
+# Features by decreasing importance: total.hits, WoY, visitNumber, visit_hour
+# quarter_month, geoNetwork.city, weekday
 
 # Create submission
 submission = test_df[['fullVisitorId']].copy()
 submission.loc[:, 'PredictedLogRevenue'] = np.expm1(predictions)
 grouped_test = submission[['fullVisitorId', 'PredictedLogRevenue']].groupby('fullVisitorId').sum().reset_index()
-grouped_test["PredictedLogRevenue"] = np.log1p(grouped_test["PredictedLogRevenue"])
+grouped_test['PredictedLogRevenue'] = np.log1p(grouped_test['PredictedLogRevenue'])
 grouped_test.to_csv('submit.csv',index=False)
 
