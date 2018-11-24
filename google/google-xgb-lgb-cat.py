@@ -11,6 +11,7 @@ Data: preprocessed data for Part A + exported google analytics data
 Algorithms Used: XGB, LGB, CAT
 Model Scores (CV Score):
 1-LGB 1.65670
+2-XGB 1.69551
 
 References:
 - https://www.kaggle.com/zikazika/google-predictions
@@ -27,8 +28,9 @@ import catboost as cat
 import gc
 gc.enable()
 from datetime import datetime
-from sklearn.model_selection import KFold
+from sklearn.model_selection import KFold, train_test_split
 from sklearn.metrics import mean_squared_error
+
 
 def read_external_data(filename):
     return pd.read_csv(filename, low_memory=False, skiprows=6, dtype={'Client Id':'str'})
@@ -184,3 +186,38 @@ grouped_test = submission[['fullVisitorId', 'PredictedLogRevenue']].groupby('ful
 grouped_test['PredictedLogRevenue'] = np.log1p(grouped_test['PredictedLogRevenue'])
 grouped_test.to_csv('submit.csv',index=False)
 
+
+# Model 2 - XGBoost
+param = {
+    'objective': 'reg:linear',
+    'eval_metric': 'rmse',
+    'eta': 0.001,
+    'max_depth': 10,
+    'subsample': 0.6,
+    'colsample_bytree': 0.6,
+    'alpha':0.001,
+    'random_state': 42,
+    'silent': True
+}
+
+# DMatrix requirement: DataFrame.dtypes for data must be int, float or bool.
+# Use label-encoded data instead of raw df valuesa but delete 'fullVisitorId'
+del train_df['fullVisitorId']
+
+X_train, X_val, y_train, y_val = train_test_split(train_df, target, test_size=0.15, random_state=1)
+xgb_train = xgb.DMatrix(X_train, y_train)
+xgb_val = xgb.DMatrix(X_val, y_val)
+
+model = xgb.train(
+    param,
+    xgb_train,
+    num_boost_round=2000,
+    evals= [(xgb_train, 'train'), (xgb_val, 'valid')],
+    early_stopping_rounds=100,
+    verbose_eval=500
+)
+
+y_pred_train = model.predict(xgb_train, ntree_limit=model.best_ntree_limit)
+y_pred_val = model.predict(xgb_val, ntree_limit=model.best_ntree_limit)
+print(f"XGB : RMSE val: {rmse(y_val, y_pred_val)}  - RMSE train: {rmse(y_train, y_pred_train)}")
+# [1999] train-rmse:1.6204 valid-rmse:1.69551
