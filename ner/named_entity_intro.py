@@ -15,8 +15,11 @@ References:
 import pandas as pd
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import cross_val_predict
+from sklearn.metrics import classification_report
 
 from sentence_getter import SentenceGetter
+from memory_tagger import MemoryTagger
 
 data = pd.read_csv("data/ner_dataset.csv", encoding="latin1")
 # Replace NaN with the preceding non-NaN value
@@ -32,8 +35,8 @@ print(sorted(data.groupby('Tag').size()))
 # O tag count is 887908 (almost 85% of labels)
 
 # When evaluating classification metrics, remove O tag since it dominates the data set
-new_classes = data['Tag'].unique().copy()
-list(new_classes).pop() # O tag is the last class
+new_classes = data['Tag'].unique().tolist().copy()
+new_classes.pop(0) # O tag is the first class
 
 getter = SentenceGetter(data)
 sent, pos, tag = getter.get_next()
@@ -45,3 +48,15 @@ print(tag[:8])
 # ['NNS', 'IN', 'NNS', 'VBP', 'VBN', 'IN', 'NNP', 'TO']
 # ['O', 'O', 'O', 'O', 'O', 'O', 'B-geo', 'O']
 
+
+# Model 1 - Baseline
+# Memorize the training data and predict the most common entity for a given word
+tagger = MemoryTagger()
+tagger.fit(sent, tag)
+
+words = data["Word"].values.tolist()
+tags = data["Tag"].values.tolist()
+pred = cross_val_predict(estimator=MemoryTagger(), X=words, y=tags, cv=5)
+report = classification_report(y_pred=pred, y_true=tags, labels=new_classes)
+# Report        precision    recall  f1-score   support
+# weighted avg       0.76      0.68      0.71    160667
